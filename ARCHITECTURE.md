@@ -1,12 +1,12 @@
-# SCiXus — Architecture Deep Dive
+# SCiXus: Architecture Deep Dive
 
 Companion to `CASE_STUDY.md`. This goes module-by-module through the actual
 data flow, from raw source content to a cited answer in Teams. Written from
 the real implementation (private repo); no corpus content is reproduced here,
-only the mechanics. I built and maintain every layer described below —
-ingestion, retrieval, the conversational layer, and the deployment.
+only the mechanics. I built and maintain every layer described below,
+including ingestion, retrieval, the conversational layer, and the deployment.
 
-## 1. Ingestion — three sources, three cleaning problems
+## 1. Ingestion: three sources, three cleaning problems
 
 | Source | Script | Format on disk | Core problem solved |
 |---|---|---|---|
@@ -32,7 +32,7 @@ metrics treat all three sources uniformly.
   chunk forward into the next one so a concept split across a chunk boundary
   still has some shared context on both sides.
 - A per-corpus stats pass (`corpus_stats.json`) tracks category counts, empty
-  articles, and — notably — how many article titles exist in both the
+  articles, and, notably, how many article titles exist in both the
   outgoing "10.7" category and the current "10.8/11.0" set (1,986 at last
   count), which is the number that motivated the revision-down-ranking logic
   in the retriever rather than a naive delete-the-old-version approach.
@@ -46,7 +46,7 @@ Two input shapes are handled:
   course JSON. `collect_text()` recursively walks the tree, pulling any string
   value under a fixed set of content-bearing keys (`html`, `paragraph`,
   `text`, `title`, `heading`, `caption`, `subtitle`, `listItem`,
-  `items_text`) and skipping everything else — this avoids hand-writing a
+  `items_text`) and skipping everything else; this avoids hand-writing a
   schema for every possible Rise block type.
 - **DOM-capture fallback**: when a module was captured as rendered text
   instead of raw JSON, a large noise-pattern regex filters out interactive-UI
@@ -65,7 +65,7 @@ carry that metadata explicitly.
 - A noise regex drops lines matching known page furniture: page-number
   markers, "CONFIDENTIAL INFORMATION," "PROPRIETARY INFORMATION," copyright
   lines, the "Consulting Services | STORIS" footer, trade-secret legal
-  boilerplate, and a specific watermark string — all of which repeat on every
+  boilerplate, and a specific watermark string, all of which repeat on every
   page and would otherwise dominate chunk text if left in.
 - Dotted table-of-contents leaders (`"Heading ...... 5"`) are stripped with a
   trailing-dots regex rather than dropping the whole line, since the heading
@@ -85,14 +85,14 @@ carry that metadata explicitly.
   a fixed `SYNONYMS` dict of STORIS-specific phrase mappings (e.g. `"write a
   sale"` → `"enter sales order point of sale"`) and appends any matches to the
   query text. This is a deliberately simple substring match, not a learned
-  model — cheap, auditable, and easy to extend by adding a dictionary entry
+  model: cheap, auditable, and easy to extend by adding a dictionary entry
   when a new vocabulary gap is found (e.g. via the knowledge-gap log).
 - **Ranking**: `retrieve()` scores all chunks, then walks the top 400 by raw
   BM25 score applying two adjustments before taking the final top-k:
-  1. **Revision down-ranking** — any chunk categorized under the outgoing
+  1. **Revision down-ranking**: any chunk categorized under the outgoing
      "10.7" doc set has its score multiplied by 0.80, so a current-revision
      article with a similar score wins.
-  2. **Title-based dedup** — chunks are deduped by a normalized (lowercased,
+  2. **Title-based dedup**: chunks are deduped by a normalized (lowercased,
      punctuation-stripped) title, keeping only the highest-scoring chunk per
      title. This collapses cross-listed FAQs and the 10.7/current pairs into
      a single result rather than showing near-duplicate hits.
@@ -104,7 +104,7 @@ This is the channel-agnostic core called by both `teams_bot.py` and `app.py`.
 
 1. **Screenshot understanding** (if an image is attached): a cheap vision call
    asks Claude to name the visible screen, list field/button/error text, and
-   emit a `KEYWORDS:` line for retrieval — the human-readable description and
+   emit a `KEYWORDS:` line for retrieval; the human-readable description and
    the keyword line are parsed apart from a single response.
 2. **Query construction**: folds together the current message, any screenshot
    keywords, the previous user turn (so a follow-up like "I only see the
@@ -128,12 +128,12 @@ This is the channel-agnostic core called by both `teams_bot.py` and `app.py`.
    logging pipeline described in the case study.
 
 Running without `ANTHROPIC_API_KEY` degrades gracefully to a retrieval-only
-mode (returns the matched article titles instead of a generated answer) —
+mode (returns the matched article titles instead of a generated answer);
 useful for verifying the retrieval side in isolation.
 
 ## 4. Deployment topology
 
-- **Hosting**: Render (`render.yaml`), Standard plan (2GB) — sized because the
+- **Hosting**: Render (`render.yaml`), Standard plan (2GB), sized because the
   loaded BM25 index measures ~466MB, which would OOM a 512MB instance. The
   build command reinstalls dependencies and calls `retriever.build_index()`
   fresh on every deploy rather than committing the ~43MB pickle to git.
@@ -163,7 +163,7 @@ useful for verifying the retrieval side in isolation.
 In priority order, based on the limitations already called out in code
 comments and deploy notes:
 
-1. Replace or hybridize the BM25 scorer with embedding similarity —
+1. Replace or hybridize the BM25 scorer with embedding similarity;
    `retrieve()`'s interface is already stable for this swap.
 2. Move conversation state out of in-process `MemoryStorage` into Azure Blob
    or Cosmos DB so state survives restarts and horizontal scaling.

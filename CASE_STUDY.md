@@ -1,4 +1,4 @@
-# SCiXus — A Production RAG Assistant for ERP Support
+# SCiXus: A Production RAG Assistant for ERP Support
 
 **One-line summary:** SCiXus is a retrieval-augmented chatbot that answers STORIS ERP
 how-to and troubleshooting questions for retail staff at 1915 South, deployed live in
@@ -6,19 +6,19 @@ Microsoft Teams, grounded in ~18,000 chunks of internal help-desk and training c
 with a closed-loop process for surfacing what it can't answer yet.
 
 > This document describes the system's design, decisions, and results. It does not
-> include the underlying corpus, code, or any proprietary STORIS/Zendesk content —
+> include the underlying corpus, code, or any proprietary STORIS/Zendesk content;
 > those remain in a private repository. Numbers below (corpus size, retrieval scores)
 > are real, pulled from the system's own stats and eval output.
 
-**Role:** I was the sole architect and engineer on this project end to end — problem
+**Role:** I was the sole architect and engineer on this project end to end, covering problem
 scoping, corpus design and ingestion pipelines, retrieval and generation architecture,
 Teams/Azure deployment, and ongoing maintenance and iteration since launch.
 
 ## The problem
 
 STORIS is the ERP system 1915 South's retail staff use to run sales, service, and
-inventory. The documentation for it — thousands of Zendesk help articles plus a
-separate Academy training platform — is comprehensive but not something a busy
+inventory. The documentation for it, thousands of Zendesk help articles plus a
+separate Academy training platform, is comprehensive but not something a busy
 sales associate is going to search through mid-transaction. The result: repeated
 interruptions to managers and power users for the same handful of "how do I..."
 questions, and slower onboarding for new hires, especially with STORIS NextGen
@@ -28,13 +28,13 @@ questions, and slower onboarding for new hires, especially with STORIS NextGen
 
 - Answers "how do I write a sale," "how do I process a return," etc. in plain
   language, grounded in and citing the actual STORIS documentation.
-- Reads screenshots — a user can paste a picture of the screen they're stuck on,
+- Reads screenshots: a user can paste a picture of the screen they're stuck on,
   and the bot identifies the screen, reads visible fields/errors, and adjusts its
   guidance accordingly.
 - Holds a real conversation. Follow-ups like "I don't see that, I only have the
   customer fields" are understood in context, not treated as a fresh query.
 - Knows when it doesn't know. When the docs don't cover a situation, it says so
-  and hands off to a human rather than guessing — and that handoff is itself a
+  and hands off to a human rather than guessing, and that handoff is itself a
   signal that feeds a content-improvement loop (see below).
 - Lives in Microsoft Teams, where staff already work.
 
@@ -71,15 +71,15 @@ retrieval and generation path runs in one Python process.
 ## Key technical decisions and tradeoffs
 
 **Retrieval: BM25 + a hand-built synonym layer, not embeddings.**
-The retriever (`retriever.py`) is pure lexical search — `rank_bm25`'s BM25Okapi
-over tokenized chunks — plus a small dictionary that maps how staff actually talk
+The retriever (`retriever.py`) is pure lexical search: `rank_bm25`'s BM25Okapi
+over tokenized chunks, plus a small dictionary that maps how staff actually talk
 ("write a sale," "ring up," "layaway") to the vocabulary the docs use ("Enter a
 Sales Order," "point of sale," "deposit"). This was a deliberate choice for a
 v1: zero infrastructure, zero per-query API cost, deterministic and fully
 explainable ranking, and no embedding model to select, host, or version. The
 tradeoff is explicit and documented in the code: BM25 misses genuine vocabulary
 gaps a synonym entry hasn't anticipated ("add a new customer" was a known miss
-in the eval set), and BM25 scores are not a calibrated confidence signal — a
+in the eval set), and BM25 scores are not a calibrated confidence signal. A
 correct top hit and an irrelevant one can score in an unpredictable range
 relative to each other, which matters for the escalation design below. The
 upgrade path (swap the scorer for embedding similarity, or run both as a hybrid)
@@ -94,7 +94,7 @@ structure (a chunk rarely splits a numbered step list mid-stream) instead of
 cutting at an arbitrary token boundary, at the cost of some chunk-size variance.
 
 **Revision handling instead of deduplication.**
-STORIS documentation carries near-duplicate articles across ERP versions —
+STORIS documentation carries near-duplicate articles across ERP versions:
 1,986 titles exist in both the outgoing "10.7" doc set and the current
 "10.8/11.0" set. Rather than deleting the older version (which would lose
 version-specific detail some users still need), the retriever down-weights
@@ -102,7 +102,7 @@ version-specific detail some users still need), the retriever down-weights
 result-composition time, so the current-revision article wins ties without the
 old one being unavailable entirely.
 
-**Escalation is model-judged, not score-gated — and that's a known compromise.**
+**Escalation is model-judged, not score-gated, and that's a known compromise.**
 Because BM25 scores aren't calibrated, escalation ("I can't resolve this, here's
 a human to ask") is driven by asking Claude to emit a literal `<ESCALATE>` tag
 when the retrieved context genuinely doesn't cover the situation, rather than by
@@ -126,12 +126,12 @@ and `interface` (ERP/NextGen), which the retriever and the answer-generation
 metrics both use.
 
 **Generation: Claude, with a strict grounding instruction.**
-Answers come from Claude Haiku by default (fast, cheap — the README notes an
+Answers come from Claude Haiku by default (fast, cheap; the README notes an
 older cost estimate of roughly $0.005/question), with the system prompt
 instructing it to answer only from the retrieved articles and never invent
 menu names, fields, or steps. Screenshot reading uses the same model by
 default but is explicitly overridable (`STORIS_VISION_MODEL`) to a stronger
-model, because dense STORIS screens read more reliably with more capability —
+model, because dense STORIS screens read more reliably with more capability;
 this is pinned in the deploy config specifically so a dashboard override
 doesn't silently regress screenshot quality across deploys.
 
@@ -139,13 +139,13 @@ doesn't silently regress screenshot quality across deploys.
 Every question and every thumbs up/down is POSTed to a webhook that logs into a
 SharePoint sheet, which a scheduled Power Automate flow summarizes with AI and
 emails to leadership weekly. The single most useful column in that log is a
-computed `knowledge_gap` flag (true on escalation or a thumbs-down) — it turns
+computed `knowledge_gap` flag (true on escalation or a thumbs-down); it turns
 "the bot doesn't know something" from an invisible failure into a visible,
 prioritized backlog of exactly what documentation or training content to add
 next. That closes the loop between usage and content improvement without
 requiring anyone to manually review transcripts.
 
-## Setup and usage (for reference — real corpus not included here)
+## Setup and usage (for reference; real corpus not included here)
 
 ```bash
 pip install -r requirements.txt
@@ -165,7 +165,7 @@ hosted on Render, with conversation logging into SharePoint via Power Automate.
   courses and a PDF training workbook, totaling roughly 18,000 indexed chunks.
 - **Retrieval quality:** hit@3 = 92%, hit@1 = 75% on a 12-question hand-built
   smoke test (`eval.py`) covering common staff questions. This is a directional
-  check, not a rigorous benchmark — see Limitations.
+  check, not a rigorous benchmark; see Limitations.
 - **Deployed and in real use** inside Microsoft Teams at 1915 South, answering
   live staff questions with source citations and a working escalation path.
 
@@ -176,12 +176,12 @@ A hiring manager will notice these; better to say them plainly:
 - **No automated test suite and no CI.** `eval.py` is a 12-case retrieval smoke
   test, not unit/integration tests, and there's nothing running it on push.
 - **The eval set is small and retrieval-only.** It checks whether the right
-  article surfaces, not whether the generated answer is correct — there's no
+  article surfaces, not whether the generated answer is correct; there's no
   end-to-end answer-quality eval yet.
 - **`corpus_stats.json` is stale.** It reflects the original Zendesk-only
   ingest (17,597 chunks) and was never regenerated after the Academy content
   merge brought the total to ~18,000.
-- **BM25 confidence isn't calibrated**, as discussed above — a known,
+- **BM25 confidence isn't calibrated**, as discussed above, a known,
   documented limitation of the v1 retrieval design, with a clear upgrade path
   already designed into the retriever's interface.
 - **Conversation memory is in-process** (`MemoryStorage`), which is fine for a
@@ -204,5 +204,5 @@ A hiring manager will notice these; better to say them plainly:
 ---
 
 *[TODO: confirm] add a short demo GIF or screenshots of the Teams bot in
-action once available — none currently exist outside the live tenant, and I'm
+action once available; none currently exist outside the live tenant, and I'm
 not fabricating a mockup of a real production UI.*
